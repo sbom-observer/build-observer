@@ -1,0 +1,62 @@
+// Copyright 2024 Bitfront AB - All rights reserved
+// Author: Andreas Bielk
+
+BEGIN {
+  @pids[cpid] = 1;
+  //printf("pid %d cpid %d tid %d\n", pid, cpid, tid);
+  printf("start ");
+  time("%Y-%m-%dT%H:%M:%S");
+  printf("\n");
+}
+
+END {
+  printf("stop ");
+  time("%Y-%m-%dT%H:%M:%S");
+  printf("\n");
+}
+
+// track new processes spawned by monitored PIDs
+// we need to track forks to support dropping privs using sudo (which double forks)
+tracepoint:sched:sched_process_fork /@pids[pid] || @pids[curtask->parent->pid]/ {
+    //printf("%s pid %d cpid %d tid %d ppid %d -> %s\n",probe, pid,cpid, tid, curtask->parent->pid, comm);
+    @pids[pid] = 1;
+}
+
+tracepoint:syscalls:sys_enter_exec* /@pids[pid] || @pids[curtask->parent->pid]/ {
+    @pids[pid] = 1;
+    @cmd[tid] = str(args->filename);
+}
+
+tracepoint:syscalls:sys_exit_exec* /@pids[pid]/ {
+  if (args->ret >=0) {
+    $cmd = @cmd[tid];
+    if ($cmd != "") {
+      printf("exec\t%s\n",$cmd)
+    }
+  }
+  delete(@cmd[tid])
+}
+
+tracepoint:sched:sched_process_exit /@pids[pid]/ {
+    delete(@pids[pid]);
+}
+
+// track the paths of opened files
+tracepoint:syscalls:sys_enter_openat, tracepoint:syscalls:sys_enter_open /@pids[pid]/ {
+    @path[tid] = str(args->filename)
+}
+
+tracepoint:syscalls:sys_exit_openat, tracepoint:syscalls:sys_exit_open {
+  // we only care about successful opens (i.e. existing files)
+  if (args->ret >= 0 && comm != "sudo") {
+    $path = @path[tid];
+    if ($path != "") {
+      printf("open\t%s\t%s\n",comm,$path);
+    }
+  }
+
+  delete(@path[tid])
+}
+
+
+
