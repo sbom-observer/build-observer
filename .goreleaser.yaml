@@ -51,6 +51,8 @@ nfpms:
         dst: /usr/share/doc/build-observer/copyright
         file_info:
           mode: 0644
+    dependencies:
+      - bpftrace
     formats:
 #      - apk
       - deb
