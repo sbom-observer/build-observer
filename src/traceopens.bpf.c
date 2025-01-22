@@ -28,6 +28,14 @@ struct {
     __type(value, char[MAX_PATH_LEN]);
 } path_map SEC(".maps");
 
+// Per-CPU array for event data
+struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __uint(max_entries, 1);
+    __type(key, u32);
+    __type(value, struct event);
+} heap SEC(".maps");
+
 SEC("tp/sched/sched_process_fork")
 int handle_fork(struct trace_event_raw_sched_process_fork *ctx)
 {
@@ -52,8 +60,13 @@ int handle_openat_enter(struct trace_event_raw_sys_enter *ctx)
     if (!exists)
         return 0;
 
-    const char *filename = (const char *)ctx->args[1];
-    bpf_map_update_elem(&path_map, &pid, (void *)filename, BPF_ANY);
+    char filename[MAX_PATH_LEN];
+    const char *user_filename;
+    
+    user_filename = (const char *)BPF_CORE_READ(ctx, args[1]);
+    
+    bpf_probe_read_user_str(filename, sizeof(filename), user_filename);
+    bpf_map_update_elem(&path_map, &pid, filename, BPF_ANY);
     
     return 0;
 }
@@ -71,16 +84,22 @@ int handle_openat_exit(struct trace_event_raw_sys_exit *ctx)
     if (!path)
         goto cleanup;
 
-    struct event e = {};
-    e.pid = pid;
-    e.type = 2; // open
+    // Get pointer to per-CPU array
+    u32 zero = 0;
+    struct event *e = bpf_map_lookup_elem(&heap, &zero);
+    if (!e)
+        goto cleanup;
+
+    // Fill event data
+    e->pid = pid;
+    e->type = 2; // open
     
-    bpf_get_current_comm(e.comm, sizeof(e.comm));
-    bpf_probe_read_user_str(e.filename, sizeof(e.filename), path);
+    bpf_get_current_comm(e->comm, sizeof(e->comm));
+    __builtin_memcpy(e->filename, path, MAX_PATH_LEN);
     
-    bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &e, sizeof(e));
+    bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, e, sizeof(*e));
 
 cleanup:
     bpf_map_delete_elem(&path_map, &pid);
     return 0;
-} 
+}
