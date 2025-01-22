@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
 #include <bpf/libbpf.h>
+#include <linux/types.h>  // for __u32 and __u8
+#include "traceopens.h"
 #include "traceopens.skel.h"
 
 static volatile bool exiting = false;

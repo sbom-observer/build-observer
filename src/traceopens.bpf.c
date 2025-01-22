@@ -2,20 +2,9 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
+#include "traceopens.h"
 
 char LICENSE[] SEC("license") = "GPL";
-
-// Max path length for file names
-#define MAX_PATH_LEN 256
-#define MAX_COMM_LEN 16
-
-struct event {
-    __u32 pid;
-    __u32 ppid;
-    char comm[MAX_COMM_LEN];
-    char filename[MAX_PATH_LEN];
-    __u8 type;  // 1 = exec, 2 = open
-};
 
 // Maps to track state
 struct {

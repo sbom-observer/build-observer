@@ -10,8 +10,8 @@ all: traceopens
 %.skel.h: %.bpf.o
 	$(BPFTOOL) gen skeleton $< > $@
 
-traceopens: traceopens.c traceopens.skel.h
-	$(CC) $(CFLAGS) -o $@ traceopens.c -lbpf -lelf
+traceopens: traceopens.c traceopens.skel.h traceopens.h
+	$(CC) $(CFLAGS) -o $@ $< -lbpf -lelf
 
 clean:
 	rm -f *.o *.skel.h traceopens 
