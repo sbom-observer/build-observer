@@ -15,9 +15,8 @@ struct {
 } pids SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32));
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 256 * 1024); /* 256 KB */
 } events SEC(".maps");
 
 // Temporary maps for passing data between enter and exit
@@ -76,7 +75,7 @@ int handle_openat_exit(struct trace_event_raw_sys_exit *ctx)
 {
     pid_t pid = bpf_get_current_pid_tgid() >> 32;
     int ret = ctx->ret;
-
+    
     if (ret < 0)
         goto cleanup;
 
@@ -84,20 +83,20 @@ int handle_openat_exit(struct trace_event_raw_sys_exit *ctx)
     if (!path)
         goto cleanup;
 
-    // Get pointer to per-CPU array
-    u32 zero = 0;
-    struct event *e = bpf_map_lookup_elem(&heap, &zero);
+    // Reserve space in the ring buffer
+    struct event *e = bpf_ringbuf_reserve(&events, sizeof(struct event), 0);
     if (!e)
         goto cleanup;
 
     // Fill event data
     e->pid = pid;
     e->type = 2; // open
-
+    
     bpf_get_current_comm(e->comm, sizeof(e->comm));
     __builtin_memcpy(e->filename, path, MAX_PATH_LEN);
-
-    bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, e, sizeof(*e));
+    
+    // Submit event to ring buffer
+    bpf_ringbuf_submit(e, 0);
 
 cleanup:
     bpf_map_delete_elem(&path_map, &pid);

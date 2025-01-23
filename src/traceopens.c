@@ -3,8 +3,8 @@
 #include <signal.h>
 #include <time.h>
 #include <bpf/libbpf.h>
-#include <bpf/bpf.h>  // for bpf_map_update_elem
-#include <linux/types.h>  // for __u32 and __u8
+#include <bpf/bpf.h>
+#include <linux/types.h>
 #include <sys/wait.h>
 #include <stdlib.h>
 #include "traceopens.h"
@@ -17,10 +17,10 @@ static void sig_handler(int sig)
     exiting = true;
 }
 
-void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
+static int handle_event(void *ctx, void *data, size_t data_sz)
 {
     const struct event *e = data;
-
+    
     switch (e->type) {
         case 1:
             printf("exec\t%s\n", e->filename);
@@ -29,11 +29,12 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
             printf("open\t%s\t%s\n", e->comm, e->filename);
             break;
     }
+    return 0;
 }
 
 int main(int argc, char **argv)
 {
-    struct perf_buffer *pb = NULL;
+    struct ring_buffer *rb = NULL;
     struct traceopens_bpf *skel;
     int err;
     pid_t child_pid;
@@ -64,12 +65,11 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
-    /* Set up perf buffer */
-    pb = perf_buffer__new(bpf_map__fd(skel->maps.events), 64,
-                         handle_event, NULL, NULL, NULL);
-    if (!pb) {
+    /* Set up ring buffer */
+    rb = ring_buffer__new(bpf_map__fd(skel->maps.events), handle_event, NULL, NULL);
+    if (!rb) {
         err = -1;
-        fprintf(stderr, "Failed to create perf buffer\n");
+        fprintf(stderr, "Failed to create ring buffer\n");
         goto cleanup;
     }
 
@@ -107,9 +107,9 @@ int main(int argc, char **argv)
 
     /* Main loop */
     while (!exiting) {
-        err = perf_buffer__poll(pb, 100);
+        err = ring_buffer__poll(rb, 100 /* timeout, ms */);
         if (err < 0 && err != -EINTR) {
-            fprintf(stderr, "Error polling perf buffer: %d\n", err);
+            fprintf(stderr, "Error polling ring buffer: %d\n", err);
             goto cleanup;
         }
 
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
     printf("%s", ctime(&now));
 
 cleanup:
-    perf_buffer__free(pb);
+    ring_buffer__free(rb);
     traceopens_bpf__destroy(skel);
     return err != 0;
 }
