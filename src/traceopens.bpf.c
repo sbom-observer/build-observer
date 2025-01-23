@@ -62,12 +62,12 @@ int handle_openat_enter(struct trace_event_raw_sys_enter *ctx)
 
     char filename[MAX_PATH_LEN];
     const char *user_filename;
-    
+
     user_filename = (const char *)BPF_CORE_READ(ctx, args[1]);
-    
+
     bpf_probe_read_user_str(filename, sizeof(filename), user_filename);
     bpf_map_update_elem(&path_map, &pid, filename, BPF_ANY);
-    
+
     return 0;
 }
 
@@ -76,7 +76,7 @@ int handle_openat_exit(struct trace_event_raw_sys_exit *ctx)
 {
     pid_t pid = bpf_get_current_pid_tgid() >> 32;
     int ret = ctx->ret;
-    
+
     if (ret < 0)
         goto cleanup;
 
@@ -93,10 +93,10 @@ int handle_openat_exit(struct trace_event_raw_sys_exit *ctx)
     // Fill event data
     e->pid = pid;
     e->type = 2; // open
-    
+
     bpf_get_current_comm(e->comm, sizeof(e->comm));
     __builtin_memcpy(e->filename, path, MAX_PATH_LEN);
-    
+
     bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, e, sizeof(*e));
 
 cleanup:
