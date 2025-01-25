@@ -13,5 +13,8 @@ all: traceopens
 traceopens: traceopens.c traceopens.skel.h traceopens.h
 	$(CC) $(CFLAGS) -o $@ $< -lbpf -lelf
 
+traceopens_ptrace: traceopens_ptrace.c
+	$(CC) $(CFLAGS) -o $@ $<
+
 clean:
 	rm -f *.o *.skel.h traceopens 
