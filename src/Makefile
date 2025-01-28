@@ -1,5 +1,5 @@
 CLANG ?= clang
-CFLAGS := -g -O2 -Wall
+CFLAGS := -g -O2 -Wall -I../bpf/headers
 BPFTOOL ?= bpftool
 
 all: traceopens
@@ -10,7 +10,7 @@ all: traceopens
 %.skel.h: %.bpf.o
 	$(BPFTOOL) gen skeleton $< > $@
 
-traceopens: traceopens.c traceopens.skel.h traceopens.h
+traceopens: traceopens.c traceopens.skel.h ../bpf/headers/traceopens.h ../bpf/headers/vmlinux.h
 	$(CC) $(CFLAGS) -o $@ $< -lbpf -lelf
 
 traceopens_ptrace: traceopens_ptrace.c

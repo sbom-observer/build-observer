@@ -7,7 +7,7 @@
 #include <linux/types.h>
 #include <sys/wait.h>
 #include <stdlib.h>
-#include "traceopens.h"
+#include "../bpf/headers/traceopens.h"
 #include "traceopens.skel.h"
 
 static volatile bool exiting = false;
