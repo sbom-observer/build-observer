@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"syscall"
 	"time"
@@ -34,6 +35,9 @@ type Event struct {
 	Filename [MaxPathLen]byte
 	Type     uint8
 }
+
+const EVENT_TYPE_EXEC = 1
+const EVENT_TYPE_OPEN = 2
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang traceopens ../../bpf/traceopens.bpf.c -- -I../../bpf/headers
 
@@ -154,10 +158,10 @@ func TraceCommand(args []string) (*TraceCommandResult, error) {
 			filename := bytesToString(event.Filename[:])
 
 			switch event.Type {
-			case 1:
-				filesExecuted[filename] = struct{}{}
-			case 2:
-				// Resolve the path for openat
+			case EVENT_TYPE_EXEC:
+				resolvedPath := resolvePath(event.Pid, -100, filename)
+				filesExecuted[resolvedPath] = struct{}{}
+			case EVENT_TYPE_OPEN:
 				resolvedPath := resolvePath(event.Pid, event.Dirfd, filename)
 				filesOpened[resolvedPath] = struct{}{}
 			}
@@ -193,10 +197,21 @@ func TraceCommand(args []string) (*TraceCommandResult, error) {
 
 	stop := time.Now()
 
+	resultOpened := slices.Collect(maps.Keys(filesOpened))
+	resultExecuted := slices.Collect(maps.Keys(filesExecuted))
+
+	for i := range resultOpened {
+		resultOpened[i] = filepath.Clean(resultOpened[i])
+	}
+
+	for i := range resultExecuted {
+		resultExecuted[i] = filepath.Clean(resultExecuted[i])
+	}
+
 	return &TraceCommandResult{
 		Start:         start,
 		Stop:          stop,
-		FilesOpened:   slices.Collect(maps.Keys(filesOpened)),
-		FilesExecuted: slices.Collect(maps.Keys(filesExecuted)),
+		FilesOpened:   resultOpened,
+		FilesExecuted: resultExecuted,
 	}, nil
 }

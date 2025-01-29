@@ -51,5 +51,5 @@ func resolvePath(pid uint32, dirfd int32, filename string) string {
 
 	dirfdCache[dirdfKey{pid, dirfd}] = fdPath
 
-	return filepath.Join(fdPath, filename)
+	return filepath.Clean(filepath.Join(fdPath, filename))
 }

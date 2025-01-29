@@ -36,3 +36,4 @@ build-observer-go
 src/build-observations.json
 src/build-observer
 src/traceopens.skel.h
+connect-dev.sh
