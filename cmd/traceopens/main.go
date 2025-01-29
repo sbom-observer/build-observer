@@ -27,6 +27,7 @@ const (
 type Event struct {
 	Pid      uint32
 	Ppid     uint32
+	Dirfd    int32
 	Comm     [MaxCommLen]byte
 	Filename [MaxPathLen]byte
 	Type     uint8

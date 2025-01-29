@@ -12,15 +12,6 @@ import (
 	"github.com/cilium/ebpf"
 )
 
-type traceopensEvent struct {
-	Pid      uint32
-	Ppid     uint32
-	Comm     [16]int8
-	Filename [256]int8
-	Type     uint8
-	_        [3]byte
-}
-
 // loadTraceopens returns the embedded CollectionSpec for traceopens.
 func loadTraceopens() (*ebpf.CollectionSpec, error) {
 	reader := bytes.NewReader(_TraceopensBytes)
@@ -76,7 +67,6 @@ type traceopensProgramSpecs struct {
 type traceopensMapSpecs struct {
 	Events  *ebpf.MapSpec `ebpf:"events"`
 	ExecMap *ebpf.MapSpec `ebpf:"exec_map"`
-	Heap    *ebpf.MapSpec `ebpf:"heap"`
 	PathMap *ebpf.MapSpec `ebpf:"path_map"`
 	Pids    *ebpf.MapSpec `ebpf:"pids"`
 }
@@ -109,7 +99,6 @@ func (o *traceopensObjects) Close() error {
 type traceopensMaps struct {
 	Events  *ebpf.Map `ebpf:"events"`
 	ExecMap *ebpf.Map `ebpf:"exec_map"`
-	Heap    *ebpf.Map `ebpf:"heap"`
 	PathMap *ebpf.Map `ebpf:"path_map"`
 	Pids    *ebpf.Map `ebpf:"pids"`
 }
@@ -118,7 +107,6 @@ func (m *traceopensMaps) Close() error {
 	return _TraceopensClose(
 		m.Events,
 		m.ExecMap,
-		m.Heap,
 		m.PathMap,
 		m.Pids,
 	)

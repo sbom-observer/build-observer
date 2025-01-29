@@ -29,6 +29,7 @@ const (
 type Event struct {
 	Pid      uint32
 	Ppid     uint32
+	Dirfd    int32
 	Comm     [MaxCommLen]byte
 	Filename [MaxPathLen]byte
 	Type     uint8
@@ -149,16 +150,16 @@ func TraceCommand(args []string) (*TraceCommandResult, error) {
 			}
 
 			// Convert null-terminated strings to Go strings
-			// comm := bytesToString(event.Comm[:])
+			// comm := bytesToString(event.Comm[:]) // TODO: revisit if we need this
 			filename := bytesToString(event.Filename[:])
 
 			switch event.Type {
 			case 1:
-				// fmt.Printf("exec\t%s\n", filename)
 				filesExecuted[filename] = struct{}{}
 			case 2:
-				// fmt.Printf("open\t%s\t%s\n", comm, filename)
-				filesOpened[filename] = struct{}{}
+				// Resolve the path for openat
+				resolvedPath := resolvePath(event.Pid, event.Dirfd, filename)
+				filesOpened[resolvedPath] = struct{}{}
 			}
 		}
 	}()

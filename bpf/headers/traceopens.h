@@ -8,6 +8,7 @@
 struct event {
     __u32 pid;
     __u32 ppid;
+    __s32 dirfd; 
     char comm[MAX_COMM_LEN];
     char filename[MAX_PATH_LEN];
     __u8 type;  // 1 = exec, 2 = open

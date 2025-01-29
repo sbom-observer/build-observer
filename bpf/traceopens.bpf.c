@@ -26,7 +26,10 @@ struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 10240);
     __type(key, pid_t);
-    __type(value, char[MAX_PATH_LEN]);
+    __type(value, struct {
+        int dirfd;
+        char filename[MAX_PATH_LEN];
+    });
 } path_map SEC(".maps");
 
 // Per-CPU array for event data
@@ -68,13 +71,23 @@ int handle_openat_enter(struct trace_event_raw_sys_enter *ctx)
     if (!exists)
         return 0;
 
-    char filename[MAX_PATH_LEN];
     const char *user_filename;
+    int dirfd;
 
+    // Get both dirfd and filename
+    dirfd = (int)BPF_CORE_READ(ctx, args[0]);
     user_filename = (const char *)BPF_CORE_READ(ctx, args[1]);
 
-    bpf_probe_read_user_str(filename, sizeof(filename), user_filename);
-    bpf_map_update_elem(&path_map, &pid, filename, BPF_ANY);
+    // Store both in the path_map
+    struct {
+        int dirfd;
+        char filename[MAX_PATH_LEN];
+    } path_info = {
+        .dirfd = dirfd
+    };
+    
+    bpf_probe_read_user_str(path_info.filename, sizeof(path_info.filename), user_filename);
+    bpf_map_update_elem(&path_map, &pid, &path_info, BPF_ANY);
 
     return 0;
 }
@@ -88,8 +101,11 @@ int handle_openat_exit(struct trace_event_raw_sys_exit *ctx)
     if (ret < 0)
         goto cleanup;
 
-    char *path = bpf_map_lookup_elem(&path_map, &pid);
-    if (!path)
+    struct {
+        int dirfd;
+        char filename[MAX_PATH_LEN];
+    } *path_info = bpf_map_lookup_elem(&path_map, &pid);
+    if (!path_info)
         goto cleanup;
 
     // Reserve space in the ring buffer
@@ -100,9 +116,10 @@ int handle_openat_exit(struct trace_event_raw_sys_exit *ctx)
     // Fill event data
     e->pid = pid;
     e->type = 2; // open
+    e->dirfd = path_info->dirfd;  // Include dirfd in the event
     
     bpf_get_current_comm(e->comm, sizeof(e->comm));
-    __builtin_memcpy(e->filename, path, MAX_PATH_LEN);
+    __builtin_memcpy(e->filename, path_info->filename, MAX_PATH_LEN);
     
     // Submit event to ring buffer
     bpf_ringbuf_submit(e, 0);

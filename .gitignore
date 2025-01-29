@@ -32,3 +32,7 @@ test-release.sh
 /Vagrantfile
 .vagrant
 
+build-observer-go
+src/build-observations.json
+src/build-observer
+src/traceopens.skel.h

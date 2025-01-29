@@ -35,7 +35,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Flags().StringP("output", "o", "build-observations.json", "Output filename")
-	rootCmd.Flags().StringSliceP("exclude", "e", []string{".", "*.so", "*.so.6", "*.so.2", "*.a", "/etc/ld.so.cache"}, "Exclude files from output")
+	rootCmd.Flags().StringSliceP("exclude", "e", []string{".", "..", "*.so", "*.so.6", "*.so.2", "*.a", "/etc/ld.so.cache"}, "Exclude files from output")
 	// rootCmd.Flags().StringP("user", "u", "", "Run command as user")
 }
 
