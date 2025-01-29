@@ -1,3 +1,5 @@
+# TODO: update
+
 # build-observer
 
 `build-observer` is a tool to observe the build process of a project and create a log of all files that are read, written or executed during the build.
