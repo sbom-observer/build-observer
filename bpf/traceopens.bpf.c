@@ -30,12 +30,12 @@ struct {
 } path_map SEC(".maps");
 
 // Per-CPU array for event data
-struct {
-    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-    __uint(max_entries, 1);
-    __type(key, u32);
-    __type(value, struct event);
-} heap SEC(".maps");
+// struct {
+//     __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+//     __uint(max_entries, 1);
+//     __type(key, u32);
+//     __type(value, struct event);
+// } heap SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);

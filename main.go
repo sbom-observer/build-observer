@@ -4,12 +4,16 @@ package main
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
-	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
+	"time"
+
+	"github.com/sbom-observer/build-observer/pkg/traceopens"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -17,9 +21,6 @@ var (
 	commit  = "none"
 	date    = "unknown"
 )
-
-//go:embed traceopens.bt
-var bpftraceScript []byte
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -33,8 +34,9 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().StringP("output", "o", "build-observations.out", "Output filename")
-	rootCmd.Flags().StringP("user", "u", "", "Run command as user")
+	rootCmd.Flags().StringP("output", "o", "build-observations.json", "Output filename")
+	rootCmd.Flags().StringSliceP("exclude", "e", []string{".", "*.so", "*.so.6", "*.so.2", "*.a", "/etc/ld.so.cache"}, "Exclude files from output")
+	// rootCmd.Flags().StringP("user", "u", "", "Run command as user")
 }
 
 func RunWithBpftrace(cmd *cobra.Command, args []string) {
@@ -48,30 +50,78 @@ func RunWithBpftrace(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// write script slice to tempfile
-	scriptFileName := filepath.Join(os.TempDir(), "traceopens.bt")
-	err := os.WriteFile(scriptFileName, bpftraceScript, 0644)
+	result, err := traceopens.TraceCommand(args)
 	if err != nil {
-		fmt.Printf("Error writing file: %s\n", err)
+		fmt.Printf("Error tracing command: %s\n", err)
 		os.Exit(1)
 	}
 
-	user := cmd.Flag("user").Value.String()
+	// this is the "spec" for the output file
+	type BuildObservations struct {
+		Start            time.Time `json:"start"`
+		Stop             time.Time `json:"stop"`
+		WorkingDirectory string    `json:"workingDirectory"`
+		FilesOpened      []string  `json:"opened,omitempty"`
+		FilesExecuted    []string  `json:"executed,omitempty"`
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Printf("Error getting current working directory: %s\n", err)
+		os.Exit(1)
+	}
+
+	buildObservations := BuildObservations{
+		Start:            result.Start,
+		Stop:             result.Stop,
+		FilesOpened:      result.FilesOpened,
+		FilesExecuted:    result.FilesExecuted,
+		WorkingDirectory: cwd,
+	}
+
+	// sort filesOpened and filesExecuted
+	sort.Strings(buildObservations.FilesOpened)
+	sort.Strings(buildObservations.FilesExecuted)
+
+	// filter out files that match the exclude pattern
+	exclude, _ := cmd.Flags().GetStringSlice("exclude")
+	for _, pattern := range exclude {
+		buildObservations.FilesOpened = Filter(buildObservations.FilesOpened, func(s string) bool {
+			if strings.HasPrefix(pattern, "*") {
+				return !strings.HasSuffix(s, pattern[1:])
+			}
+			return s != pattern
+		})
+		buildObservations.FilesExecuted = Filter(buildObservations.FilesExecuted, func(s string) bool {
+			if strings.HasPrefix(pattern, "*") {
+				return !strings.HasSuffix(s, pattern[1:])
+			}
+			return s != pattern
+		})
+	}
+
+	// write result to output file as json
 	output := cmd.Flag("output").Value.String()
-	target := strings.Join(args, " ")
-
-	var bpftraceArgs []string
-	if user == "" {
-		bpftraceArgs = []string{"/usr/bin/bpftrace", "-o", output, "-c", target, scriptFileName}
-	} else {
-		bpftraceArgs = []string{"/usr/bin/bpftrace", "-q", "--no-warning", "-o", output, "-c", fmt.Sprintf("/usr/bin/sudo -u %s %s", user, target), scriptFileName}
-	}
-
-	err = syscall.Exec("/usr/bin/bpftrace", bpftraceArgs, os.Environ())
+	out, err := os.Create(output)
 	if err != nil {
-		fmt.Printf("Error execing: %s\n", err)
+		fmt.Printf("Error creating output file: %s\n", err)
 		os.Exit(1)
 	}
+	defer out.Close()
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	enc.Encode(buildObservations)
+	fmt.Printf("Wrote build observations to %s\n", output)
+}
+
+func Filter[T any](slice []T, f func(T) bool) []T {
+	var n []T
+	for _, e := range slice {
+		if f(e) {
+			n = append(n, e)
+		}
+	}
+	return n
 }
 
 func main() {

@@ -60,11 +60,11 @@ func main() {
 	defer objs.Close()
 
 	// Attach tracepoints
-	tp1, err := link.Tracepoint("sched", "sched_process_fork", objs.HandleFork, nil)
+	tpFork, err := link.Tracepoint("sched", "sched_process_fork", objs.HandleFork, nil)
 	if err != nil {
 		log.Fatalf("Opening fork tracepoint: %v", err)
 	}
-	defer tp1.Close()
+	defer tpFork.Close()
 
 	tpEnterExecve, err := link.Tracepoint("syscalls", "sys_enter_execve", objs.HandleExecveEnter, nil)
 	if err != nil {
@@ -78,17 +78,17 @@ func main() {
 	}
 	defer tpExitExecve.Close()
 
-	tp2, err := link.Tracepoint("syscalls", "sys_enter_openat", objs.HandleOpenatEnter, nil)
+	tpEnterOpenat, err := link.Tracepoint("syscalls", "sys_enter_openat", objs.HandleOpenatEnter, nil)
 	if err != nil {
 		log.Fatalf("Opening openat enter tracepoint: %v", err)
 	}
-	defer tp2.Close()
+	defer tpEnterOpenat.Close()
 
-	tp3, err := link.Tracepoint("syscalls", "sys_exit_openat", objs.HandleOpenatExit, nil)
+	tpExitOpenat, err := link.Tracepoint("syscalls", "sys_exit_openat", objs.HandleOpenatExit, nil)
 	if err != nil {
 		log.Fatalf("Opening openat exit tracepoint: %v", err)
 	}
-	defer tp3.Close()
+	defer tpExitOpenat.Close()
 
 	// Create ring buffer
 	rb, err := ringbuf.NewReader(objs.Events)
