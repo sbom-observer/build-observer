@@ -6,14 +6,13 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/sbom-observer/build-observer/pkg/traceopens"
+	"github.com/sbom-observer/build-observer/pkg/types"
+	"github.com/spf13/cobra"
 	"os"
 	"sort"
 	"strings"
 	"syscall"
-	"time"
-
-	"github.com/sbom-observer/build-observer/pkg/traceopens"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -56,22 +55,13 @@ func RunWithBpftrace(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// this is the "spec" for the output file
-	type BuildObservations struct {
-		Start            time.Time `json:"start"`
-		Stop             time.Time `json:"stop"`
-		WorkingDirectory string    `json:"workingDirectory"`
-		FilesOpened      []string  `json:"opened,omitempty"`
-		FilesExecuted    []string  `json:"executed,omitempty"`
-	}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Printf("Error getting current working directory: %s\n", err)
 		os.Exit(1)
 	}
 
-	buildObservations := BuildObservations{
+	buildObservations := types.BuildObservations{
 		Start:            result.Start,
 		Stop:             result.Stop,
 		FilesOpened:      result.FilesOpened,
