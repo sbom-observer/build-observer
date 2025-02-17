@@ -23,11 +23,11 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use: "build-observer -u user -- command",
+	Use: "build-observer -- [command]",
 	//Short:   "TODO: Add a short description here",
 	//Long:    `TODO: Add a longer description here`,
 	Run:     RunWithBpftrace,
-	Example: `sudo build-observer --user vagrant -- make -f Makefile.linux build-examples`,
+	Example: `sudo build-observer -- make`,
 	Version: version,
 	Args:    cobra.MinimumNArgs(1),
 }
