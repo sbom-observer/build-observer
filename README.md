@@ -2,13 +2,16 @@
 
 # build-observer
 
-`build-observer` is a tool to observe the build process of a project and create a log of all files that are read, written or executed during the build.
+`build-observer` is a tool to observe the build process of a project and create a record of all files that are read, written or executed during the build.
 
-This log can then be used to create a Software Bill of Materials (SBOM) for the project.
+This record can then be used to create a Software Bill of Materials (SBOM) for the project. 
+See [sbom-observer](https://github.com/sbom-observer/observer-cli) for tooling and more information.
 
-> [!IMPORTANT]
-> This is a preview software and is subject to change.
+This repository contains the eBPF program and a Go wrapper to use it. Dependencies are kept to a minimum to keep the program as auditable as possible.
 
+Check [releases](https://github.com/sbom-observer/build-observer/releases) for pre-compiled binaries and SBOMs.
+
+## Usage
 ```
 Usage:
 build-observer -u user -- command [flags]
@@ -23,17 +26,17 @@ Flags:
 -v, --version         version for build-observer
 ```
 
-### Requirements
-- Linux kernel 4.9+ (for eBPF support)
-- bpftrace 0.17.0+ (for eBPF support)
+## Requirements
+- Linux kernel 5.8+ (for eBPF support)
 - build-observer needs to run as root to install eBPF program, but will drop privileges to the specified user to run the build command.
 
-## Status: proof-of-concept implementation
+## Future work
 
-This is a simple PoC of the build-observer concept that delegates the actual eBPF work to bpftrace.
+This version should be production ready, and we welcome feedback and contributions.
 
-Future work will move to C (bcc) + github.com/cilium/ebpf to simplify the
-setup and requirements for end users.
+Roadmap includes support for FreeBSD and Windows, probably using dtrace/ETW.
 
-There is also an existing implementation based on ptrace that might be
-useful (but much less performant) on platforms without eBPF support.
+## License
+
+This project is licensed under the [Apache 2.0 license](LICENSE).
+

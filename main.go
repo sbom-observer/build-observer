@@ -21,11 +21,10 @@ var (
 	date    = "unknown"
 )
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use: "build-observer -- [command]",
-	//Short:   "TODO: Add a short description here",
-	//Long:    `TODO: Add a longer description here`,
+	Use:     "build-observer -- [command]",
+	Short:   "Trace build operations",
+	Long:    `build-observer traces the files opened and executed by a command.`,
 	Run:     RunWithBpftrace,
 	Example: `sudo build-observer -- make`,
 	Version: version,
@@ -101,7 +100,12 @@ func RunWithBpftrace(cmd *cobra.Command, args []string) {
 	defer out.Close()
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
-	enc.Encode(buildObservations)
+	err = enc.Encode(buildObservations)
+	if err != nil {
+		fmt.Printf("Error writing build observations to %s: %s\n", output, err)
+		os.Exit(1)
+	}
+
 	fmt.Printf("Wrote build observations to %s\n", output)
 }
 
