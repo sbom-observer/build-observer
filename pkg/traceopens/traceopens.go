@@ -10,8 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -56,7 +58,7 @@ type TraceCommandResult struct {
 	Stop          time.Time
 }
 
-func TraceCommand(args []string) (*TraceCommandResult, error) {
+func TraceCommand(args []string, downgradeToUser string) (*TraceCommandResult, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("command is required")
 	}
@@ -110,6 +112,27 @@ func TraceCommand(args []string) (*TraceCommandResult, error) {
 		log.Fatalf("Creating ring buffer reader: %v", err)
 	}
 	defer rb.Close()
+
+	// If we are running as root, and a user is specified, downgrade to that user
+	if downgradeToUser != "" && syscall.Getuid() == 0 {
+		log.Println("Running as root, downgrading to user", downgradeToUser)
+		user, err := user.Lookup(downgradeToUser)
+		if err != nil {
+			log.Fatalln("User '"+downgradeToUser+"' not found or other error:", err)
+		}
+
+		uid, _ := strconv.ParseInt(user.Uid, 10, 32)
+		gid, _ := strconv.ParseInt(user.Gid, 10, 32)
+
+		err = syscall.Setgid(int(gid))
+		if err != nil {
+			log.Fatalf("Unable to set GID due to error: %v", err)
+		}
+		err = syscall.Setuid(int(uid))
+		if err != nil {
+			log.Fatalf("Unable to set UID due to error: %v", err)
+		}
+	}
 
 	// Start the command
 	start := time.Now()

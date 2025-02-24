@@ -35,7 +35,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Flags().StringP("output", "o", "build-observations.json", "Output filename")
 	rootCmd.Flags().StringSliceP("exclude", "e", []string{".", "..", "*.so", "*.so.6", "*.so.2", "*.a", "/etc/ld.so.cache"}, "Exclude files from output")
-	// rootCmd.Flags().StringP("user", "u", "", "Run command as user")
+	rootCmd.Flags().StringP("user", "u", "", "Run command as user")
 }
 
 func RunWithBpftrace(cmd *cobra.Command, args []string) {
@@ -49,7 +49,8 @@ func RunWithBpftrace(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	result, err := traceopens.TraceCommand(args)
+	user, _ := cmd.Flags().GetString("user")
+	result, err := traceopens.TraceCommand(args, user)
 	if err != nil {
 		fmt.Printf("Error tracing command: %s\n", err)
 		os.Exit(1)
