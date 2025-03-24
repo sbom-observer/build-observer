@@ -21,6 +21,7 @@
 # Go workspace file
 go.work
 
+/TEMP.txt
 /TODO.txt
 /scratch/
 observer
@@ -28,3 +29,11 @@ dist/
 tmp/
 release.sh
 test-release.sh
+/Vagrantfile
+.vagrant
+
+build-observer-go
+src/build-observations.json
+src/build-observer
+src/traceopens.skel.h
+connect-*
