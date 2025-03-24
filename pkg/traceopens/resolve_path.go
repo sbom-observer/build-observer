@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -33,7 +34,7 @@ func resolvePath(pid uint32, dirfd int32, filename string) string {
 	if dirfd == -100 {
 		cwdPath, err := os.Readlink(fmt.Sprintf("/proc/%d/cwd", pid))
 		if err != nil {
-			log.Printf("Error resolving current working directory: %v", err)
+			log.Printf("Warning: missed the lifetime of the current working directory for '%s': %v", filename, err)
 			return filename
 		}
 
@@ -45,8 +46,17 @@ func resolvePath(pid uint32, dirfd int32, filename string) string {
 	// Try to resolve the directory FD
 	fdPath, err := os.Readlink(fmt.Sprintf("/proc/%d/fd/%d", pid, dirfd))
 	if err != nil {
-		log.Printf("Error resolving directory FD: %v", err)
-		return filename
+		log.Printf("Error resolving directory FD for '%s': %v", filename, err)
+
+		// FALLBACK: we missed the lifetime of the FD, let's fallback to PATH and warn the user
+		log.Printf("Warning: missed the lifetime of the directory FD (%d), falling back to lookup '%s' in PATH", dirfd, filename)
+		executablePath, err := exec.LookPath(filename)
+		if err != nil {
+			log.Printf("Error resolving %s in PATH: %v", filename, err)
+			return filename
+		}
+
+		return executablePath
 	}
 
 	dirfdCache[dirdfKey{pid, dirfd}] = fdPath
