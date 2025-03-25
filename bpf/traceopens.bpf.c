@@ -1,6 +1,4 @@
 #include "vmlinux.h"
-// #include <linux/bpf.h>
-// #include <sys/types.h> 
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
@@ -40,12 +38,6 @@ struct {
 //     __type(value, struct event);
 // } heap SEC(".maps");
 
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 10240);
-    __type(key, pid_t);
-    __type(value, char[MAX_PATH_LEN]);
-} exec_map SEC(".maps");
 
 SEC("tp/sched/sched_process_fork")
 int handle_fork(struct trace_event_raw_sched_process_fork *ctx)
@@ -129,50 +121,51 @@ cleanup:
     return 0;
 }
 
-SEC("tp/syscalls/sys_enter_execve")
-int handle_execve_enter(struct trace_event_raw_sys_enter *ctx)
+/*
+ * Using raw_tracepoint/sched_process_exec instead of tp/syscalls/sys_enter_execve + sys_exit_execve
+ * for two main reasons:
+ * 
+ * 1. It provides access to the fully resolved path that the kernel actually executes.
+ *    When execve is called with a relative path or just a filename (like "ls"), 
+ *    the kernel performs PATH resolution during the syscall to find the actual 
+ *    executable (like "/bin/ls"). This tracepoint fires after that resolution,
+ *    giving us the real path that was executed.
+ * 2. It fires at the right moment after successful execution, eliminating the need for
+ *    enter/exit handler pairs and temporary maps to pass data between them
+ * 
+ * This is particularly important because by the time we try to resolve paths in userspace,
+ * short-lived processes might have already terminated, making their /proc entries 
+ * inaccessible for path resolution.
+ * 
+ * However, tp/syscalls/sys_enter_execve + sys_exit_execve might be more stable across kernels.
+ */
+SEC("raw_tracepoint/sched_process_exec")
+int handle_exec(struct bpf_raw_tracepoint_args *ctx)
 {
     pid_t pid = bpf_get_current_pid_tgid() >> 32;
     u8 *exists = bpf_map_lookup_elem(&pids, &pid);
     if (!exists)
         return 0;
 
-    char filename[MAX_PATH_LEN];
-    const char *user_filename = (const char *)BPF_CORE_READ(ctx, args[0]);
+    // Safely read the filename pointer from args
+    struct filename *fn;
+    bpf_probe_read_kernel(&fn, sizeof(fn), &ctx->args[1]);
     
-    bpf_probe_read_user_str(filename, sizeof(filename), user_filename);
-    bpf_map_update_elem(&exec_map, &pid, filename, BPF_ANY);
-
-    return 0;
-}
-
-SEC("tp/syscalls/sys_exit_execve")
-int handle_execve_exit(struct trace_event_raw_sys_exit *ctx)
-{
-    pid_t pid = bpf_get_current_pid_tgid() >> 32;
-    int ret = ctx->ret;
-    
-    if (ret < 0)
-        goto cleanup;
-
-    char *path = bpf_map_lookup_elem(&exec_map, &pid);
-    if (!path)
-        goto cleanup;
-
     struct event *e = bpf_ringbuf_reserve(&events, sizeof(struct event), 0);
     if (!e)
-        goto cleanup;
+        return 0;
 
     // Fill event data
     e->pid = pid;
     e->type = 1; // exec
     
     bpf_get_current_comm(e->comm, sizeof(e->comm));
-    __builtin_memcpy(e->filename, path, MAX_PATH_LEN);
+    
+    // Safely read the path from the filename structure
+    const char *name;
+    bpf_probe_read_kernel(&name, sizeof(name), &fn->name);
+    bpf_probe_read_kernel_str(e->filename, sizeof(e->filename), name);
     
     bpf_ringbuf_submit(e, 0);
-
-cleanup:
-    bpf_map_delete_elem(&exec_map, &pid);
     return 0;
 }

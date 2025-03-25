@@ -15,13 +15,17 @@ type dirdfKey struct {
 
 var dirfdCache = make(map[dirdfKey]string)
 
-func resolvePath(pid uint32, dirfd int32, filename string) string {
+func resolveOpenPath(pid uint32, dirfd int32, filename string) string {
 	if len(filename) == 0 {
 		return filename
 	}
 
 	// If it's an absolute path, return as is
 	if filename[0] == '/' {
+		return filename
+	}
+
+	if filename == "." || filename == ".." {
 		return filename
 	}
 
@@ -47,19 +51,41 @@ func resolvePath(pid uint32, dirfd int32, filename string) string {
 	fdPath, err := os.Readlink(fmt.Sprintf("/proc/%d/fd/%d", pid, dirfd))
 	if err != nil {
 		log.Printf("Error resolving directory FD for '%s': %v", filename, err)
+		return filename
+	}
+
+	dirfdCache[dirdfKey{pid, dirfd}] = fdPath
+
+	return filepath.Clean(filepath.Join(fdPath, filename))
+}
+
+func resolveExecPath(pid uint32, filename string) string {
+	if len(filename) == 0 {
+		return filename
+	}
+
+	// If it's an absolute path, return as is
+	if filename[0] == '/' {
+		return filename
+	}
+
+	// assertion: as we are using raw_tracepoint/sched_process_exec, the filename is already resolved
+	log.Printf("Warning: expected exec path for '%s' to be resolved to an absolute path, but it's not", filename)
+
+	// resolve relative to process's current working directory
+	cwdPath, err := os.Readlink(fmt.Sprintf("/proc/%d/cwd", pid))
+	if err != nil {
+		log.Printf("Warning: missed the lifetime of the current working directory for (exec) '%s': %v", filename, err)
 
 		// FALLBACK: we missed the lifetime of the FD, let's fallback to PATH and warn the user
-		log.Printf("Warning: missed the lifetime of the directory FD (%d), falling back to lookup '%s' in PATH", dirfd, filename)
 		executablePath, err := exec.LookPath(filename)
 		if err != nil {
-			log.Printf("Error resolving %s in PATH: %v", filename, err)
+			log.Printf("Error: failed to resolve %s in PATH: %v", filename, err)
 			return filename
 		}
 
 		return executablePath
 	}
 
-	dirfdCache[dirdfKey{pid, dirfd}] = fdPath
-
-	return filepath.Clean(filepath.Join(fdPath, filename))
+	return filepath.Join(cwdPath, filename)
 }

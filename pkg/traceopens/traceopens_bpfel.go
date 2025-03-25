@@ -54,8 +54,7 @@ type traceopensSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type traceopensProgramSpecs struct {
-	HandleExecveEnter *ebpf.ProgramSpec `ebpf:"handle_execve_enter"`
-	HandleExecveExit  *ebpf.ProgramSpec `ebpf:"handle_execve_exit"`
+	HandleExec        *ebpf.ProgramSpec `ebpf:"handle_exec"`
 	HandleFork        *ebpf.ProgramSpec `ebpf:"handle_fork"`
 	HandleOpenatEnter *ebpf.ProgramSpec `ebpf:"handle_openat_enter"`
 	HandleOpenatExit  *ebpf.ProgramSpec `ebpf:"handle_openat_exit"`
@@ -66,7 +65,6 @@ type traceopensProgramSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type traceopensMapSpecs struct {
 	Events  *ebpf.MapSpec `ebpf:"events"`
-	ExecMap *ebpf.MapSpec `ebpf:"exec_map"`
 	PathMap *ebpf.MapSpec `ebpf:"path_map"`
 	Pids    *ebpf.MapSpec `ebpf:"pids"`
 }
@@ -98,7 +96,6 @@ func (o *traceopensObjects) Close() error {
 // It can be passed to loadTraceopensObjects or ebpf.CollectionSpec.LoadAndAssign.
 type traceopensMaps struct {
 	Events  *ebpf.Map `ebpf:"events"`
-	ExecMap *ebpf.Map `ebpf:"exec_map"`
 	PathMap *ebpf.Map `ebpf:"path_map"`
 	Pids    *ebpf.Map `ebpf:"pids"`
 }
@@ -106,7 +103,6 @@ type traceopensMaps struct {
 func (m *traceopensMaps) Close() error {
 	return _TraceopensClose(
 		m.Events,
-		m.ExecMap,
 		m.PathMap,
 		m.Pids,
 	)
@@ -122,8 +118,7 @@ type traceopensVariables struct {
 //
 // It can be passed to loadTraceopensObjects or ebpf.CollectionSpec.LoadAndAssign.
 type traceopensPrograms struct {
-	HandleExecveEnter *ebpf.Program `ebpf:"handle_execve_enter"`
-	HandleExecveExit  *ebpf.Program `ebpf:"handle_execve_exit"`
+	HandleExec        *ebpf.Program `ebpf:"handle_exec"`
 	HandleFork        *ebpf.Program `ebpf:"handle_fork"`
 	HandleOpenatEnter *ebpf.Program `ebpf:"handle_openat_enter"`
 	HandleOpenatExit  *ebpf.Program `ebpf:"handle_openat_exit"`
@@ -131,8 +126,7 @@ type traceopensPrograms struct {
 
 func (p *traceopensPrograms) Close() error {
 	return _TraceopensClose(
-		p.HandleExecveEnter,
-		p.HandleExecveExit,
+		p.HandleExec,
 		p.HandleFork,
 		p.HandleOpenatEnter,
 		p.HandleOpenatExit,

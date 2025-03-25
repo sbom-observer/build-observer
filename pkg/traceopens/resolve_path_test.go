@@ -73,7 +73,7 @@ func TestResolvePath(t *testing.T) {
 			// Clear the cache before each test
 			dirfdCache = make(map[dirdfKey]string)
 
-			got := resolvePath(tt.pid, tt.dirfd, tt.filename)
+			got := resolveOpenPath(tt.pid, tt.dirfd, tt.filename)
 			if got != tt.want {
 				t.Errorf("resolvePath() = %v, want %v", got, tt.want)
 			}

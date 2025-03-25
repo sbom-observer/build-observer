@@ -82,17 +82,14 @@ func TraceCommand(args []string, downgradeToUser string) (*TraceCommandResult, e
 	}
 	defer tpFork.Close()
 
-	tpEnterExecve, err := link.Tracepoint("syscalls", "sys_enter_execve", objs.HandleExecveEnter, nil)
+	tpSchedExecve, err := link.AttachRawTracepoint(link.RawTracepointOptions{
+		Name:    "sched_process_exec",
+		Program: objs.HandleExec,
+	})
 	if err != nil {
-		log.Fatalf("Opening execve enter tracepoint: %v", err)
+		log.Fatalf("Opening sched_process_exec enter tracepoint: %v", err)
 	}
-	defer tpEnterExecve.Close()
-
-	tpExitExecve, err := link.Tracepoint("syscalls", "sys_exit_execve", objs.HandleExecveExit, nil)
-	if err != nil {
-		log.Fatalf("Opening execve exit tracepoint: %v", err)
-	}
-	defer tpExitExecve.Close()
+	defer tpSchedExecve.Close()
 
 	tpEnterOpenat, err := link.Tracepoint("syscalls", "sys_enter_openat", objs.HandleOpenatEnter, nil)
 	if err != nil {
@@ -182,10 +179,10 @@ func TraceCommand(args []string, downgradeToUser string) (*TraceCommandResult, e
 
 			switch event.Type {
 			case EVENT_TYPE_EXEC:
-				resolvedPath := resolvePath(event.Pid, -100, filename)
+				resolvedPath := resolveExecPath(event.Pid, filename)
 				filesExecuted[resolvedPath] = struct{}{}
 			case EVENT_TYPE_OPEN:
-				resolvedPath := resolvePath(event.Pid, event.Dirfd, filename)
+				resolvedPath := resolveOpenPath(event.Pid, event.Dirfd, filename)
 				filesOpened[resolvedPath] = struct{}{}
 			}
 		}
